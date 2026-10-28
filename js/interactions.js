@@ -1,75 +1,84 @@
-// Build the screen-technology buttons and connect them to histogram filtering.
+
 const populateFilters = (data) => {
-    // Step 7.3 Set up buttons and event listeners
     d3.select("#filters_screen")
-        .selectAll("button")
+        .selectAll(".filter")
         .data(filters_screen)
         .join("button")
-        .attr("class", d => d.isActive ? "filter active" : "filter")
-        .attr("id", d => d.id)
+        .attr("class", d => `filter ${d.isActive ? "active" : ""}`)
         .text(d => d.label)
         .on("click", (e, d) => {
-            // Only one filter is active at a time
-            if (d.isActive) return;
-            filters_screen.forEach(f => f.isActive = (f.id === d.id));
+            console.log("Clicked filter:", e);
+            console.log("Clicked filter data:", d);
 
-            // Update the look of the buttons
-            d3.selectAll("#filters_screen button")
-                .attr("class", f => f.isActive ? "filter active" : "filter");
+            if (!d.isActive) {
+                // Make sure the button clicked is not already active
+                filters_screen.forEach(filter => {
+                    filter.isActive = d.id === filter.id ? true : false;
+                });
 
-            // Update the histogram with the selected filter
-            updateHistogram(d.id, data);
+                // Update the filter buttons based on which one was clicked
+                d3.selectAll("#filters_screen .filter")
+                    .classed("active", filter => filter.id === d.id ? true : false);
+
+                updateHistogram(d.id, data);
+            }
         });
 };
 
 const updateHistogram = (filterId, data) => {
-    // Step 7.4 Update the histogram
     const updatedData = filterId === "all"
         ? data
-        : data.filter(d => d.screenTech === filterId);
+        : data.filter(tv => tv.screenTech === filterId);
 
     const updatedBins = binGenerator(updatedData);
 
-    // Rescale the y-axis so smaller groups (e.g. OLED) stay readable
-    yScale.domain([0, d3.max(updatedBins, d => d.length)]).nice();
-
-    innerChartH.selectAll("rect")
+    d3.selectAll("#histogram rect")
         .data(updatedBins)
-        .join("rect")
         .transition()
-        .duration(750)
+        .duration(500)
         .ease(d3.easeCubicInOut)
-        .attr("x", d => xScale(d.x0))
         .attr("y", d => yScale(d.length))
-        .attr("width", d => xScale(d.x1) - xScale(d.x0))
         .attr("height", d => innerHeight - yScale(d.length));
-
-    innerChartH.select(".y-axis")
-        .transition()
-        .duration(750)
-        .call(d3.axisLeft(yScale).tickFormat(d3.format(",")));
 };
 
-// T06-2 Step 3: Creating a tooltip and adding function call to load-data.js
+// Create the tooltip for the scatterplot
 const createTooltip = () => {
-    // Step 3.2 Append (a hidden) tooltip to innerChart
+    const tooltip = innerChartS
+        .append("g")
+        .attr("class", "tooltip")
+        .style("opacity", 0)
+        .style("pointer-events", "none");
 
-    // Step 3.3 Append tooltip background rectangle
+    // Tooltip background
+    tooltip
+        .append("rect")
+        .attr("width", tooltipWidth)
+        .attr("height", tooltipHeight)
+        .attr("rx", 3)
+        .attr("ry", 3)
+        .attr("fill", barColor)
+        .attr("fill-opacity", 0.75);
 
-    // Step 3.4 Apped tooltip text
-
+    // Tooltip text
+    tooltip
+        .append("text")
+        .text("NA")
+        .attr("x", tooltipWidth / 2)
+        .attr("y", tooltipHeight / 2 + 2)
+        .attr("text-anchor", "middle")
+        .attr("alignment-baseline", "middle")
+        .attr("fill", "white")
+        .style("font-weight", 900);
 };
 
-// T06-2 Step 3.5 Add functions to react to mouse events
+// Handle mouse events for the scatterplot
 const handleMouseEvents = () => {
     const tooltip = innerChartS.select(".tooltip");
 
-    // Step 3.6 Select all circles in scatter plot
-    // Step 3.7 Attach event listeners to mouseenter and mouseleave events
     innerChartS.selectAll("circle")
         .on("mouseenter", (e, d) => {
             tooltip.select("text")
-                .text(`${d.screenSize} inches`);
+                .text(d.screenSize); // screen size in inches
 
             // Get the hovered circle's position
             const cx = +e.target.getAttribute("cx");
@@ -81,7 +90,7 @@ const handleMouseEvents = () => {
                 .attr(
                     "transform",
                     `translate(${cx - 0.5 * tooltipWidth},
-                               ${cy - 1.5 * tooltipHeight})`
+                               ${cy - 1.2 * tooltipHeight})`
                 )
                 .transition()
                 .duration(200)
